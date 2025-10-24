@@ -1,0 +1,59 @@
+---
+- name: Add MetalLB Helm repository
+  kubernetes.core.helm_repository:
+    name: metallb
+    repo_url: https://metallb.github.io/metallb
+    kubeconfig: /var/lib/k0s/pki/admin.conf
+
+- name: Install MetalLB
+  kubernetes.core.helm:
+    name: metallb
+    chart_ref: metallb/metallb
+    release_namespace: metallb-system
+    create_namespace: yes
+    kubeconfig: /var/lib/k0s/pki/admin.conf
+
+- name: Create MetalLB IP address pool
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: metallb.io/v1beta1
+      kind: IPAddressPool
+      metadata:
+        name: public-ips
+        namespace: metallb-system
+      spec:
+        addresses:
+          - "{{ load_balancer_ip }}-{{ load_balancer_ip }}"
+        autoAssign: true
+    kubeconfig: /var/lib/k0s/pki/admin.conf
+
+- name: Create MetalLB L2 advertisement
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: metallb.io/v1beta1
+      kind: L2Advertisement
+      metadata:
+        name: public
+        namespace: metallb-system
+      spec:
+        ipAddressPools:
+          - public-ips
+    kubeconfig: /var/lib/k0s/pki/admin.conf
+
+- name: Wait for MetalLB to be ready
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: metallb-controller
+    namespace: metallb-system
+    kubeconfig: /var/lib/k0s/pki/admin.conf
+  register: metallb_status
+  until: metallb_status.resources[0].status.readyReplicas == metallb_status.resources[0].status.replicas
+  retries: 30
+  delay: 10
+
+- name: Display MetalLB status
+  debug:
+    msg: "MetalLB is now configured with IP address pool: {{ load_balancer_ip }}"

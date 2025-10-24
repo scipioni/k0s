@@ -1,0 +1,44 @@
+---
+- name: Setup k0s cluster
+  hosts: cluster
+  become: true
+  roles:
+    - common
+    - network
+    - storage
+
+- name: Setup controllers
+  hosts: controllers
+  become: true
+  roles:
+    - k0s-controller
+
+- name: Setup workers
+  hosts: workers
+  become: true
+  roles:
+    - k0s-worker
+
+- name: Deploy load balancer
+  hosts: controllers[0]
+  become: true
+  roles:
+    - loadbalancer
+
+- name: Deploy Longhorn storage
+  hosts: controllers[0]
+  become: true
+  roles:
+    - longhorn
+
+- name: Deploy Rancher
+  hosts: controllers[0]
+  become: true
+  roles:
+    - rancher
+
+- name: Deploy PostgreSQL
+  hosts: controllers[0]
+  become: true
+  roles:
+    - postgresql

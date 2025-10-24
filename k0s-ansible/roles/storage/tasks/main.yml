@@ -1,0 +1,52 @@
+---
+- name: Check if storage device exists
+  stat:
+    path: "{{ storage_device }}"
+  register: storage_device_check
+
+- name: Fail if storage device not found
+  fail:
+    msg: "Storage device {{ storage_device }} not found"
+  when: not storage_device_check.stat.exists
+
+- name: Create filesystem on storage device
+  filesystem:
+    fstype: xfs
+    dev: "{{ storage_device }}"
+  when: storage_device_check.stat.exists
+
+- name: Create mount point directory
+  file:
+    path: "{{ longhorn_mount_point }}"
+    state: directory
+    mode: '0755'
+
+- name: Mount storage device
+  mount:
+    path: "{{ longhorn_mount_point }}"
+    src: "{{ storage_device }}"
+    fstype: xfs
+    opts: defaults,noatime
+    state: mounted
+
+- name: Add to fstab
+  lineinfile:
+    path: /etc/fstab
+    line: "{{ storage_device }} {{ longhorn_mount_point }} xfs defaults,noatime 0 2"
+    create: yes
+
+- name: Set permissions for Longhorn
+  file:
+    path: "{{ longhorn_mount_point }}"
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+
+- name: Create longhorn storage directory structure
+  file:
+    path: "{{ longhorn_mount_point }}/longhorn"
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root

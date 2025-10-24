@@ -1,0 +1,55 @@
+---
+- name: Install required packages
+  apt:
+    name:
+      - curl
+      - wget
+      - gnupg
+      - software-properties-common
+    state: present
+    update_cache: yes
+
+- name: Download k0s binary
+  get_url:
+    url: "https://github.com/k0sproject/k0s/releases/download/{{ k0s_version }}/k0s-{{ k0s_version }}-amd64"
+    dest: /usr/local/bin/k0s
+    mode: '0755'
+
+- name: Get worker join token
+  shell: k0s token create --role=worker --expiry=10m
+  delegate_to: "{{ groups['controllers'][0] }}"
+  register: worker_token
+
+- name: Store worker token
+  copy:
+    content: "{{ worker_token.stdout }}"
+    dest: /tmp/worker-token
+    mode: '0600'
+
+- name: Install k0s worker
+  shell: k0s install worker --token-file /tmp/worker-token
+
+- name: Start k0s worker service
+  systemd:
+    name: k0sworker
+    state: started
+    enabled: yes
+
+- name: Wait for k0s worker to be ready
+  wait_for:
+    port: 10250
+    delay: 10
+    timeout: 300
+
+- name: Verify k0s worker status
+  shell: k0s status
+  register: k0s_worker_status
+
+- name: Display k0s worker status
+  debug:
+    var: k0s_worker_status.stdout
+
+- name: Clean up worker token
+  file:
+    path: /tmp/worker-token
+    state: absent

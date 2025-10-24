@@ -1,0 +1,36 @@
+apiVersion: k0s.k0sproject.io/v1beta1
+kind: ClusterConfig
+metadata:
+  name: k0s
+spec:
+  api:
+    address: "{{ private_ip }}"
+    sans:
+      - "{{ private_ip }}"
+      - "{{ ansible_default_ipv4.address }}"
+      - "127.0.0.1"
+      - "{{ load_balancer_ip }}"
+  network:
+    provider: calico
+    calico:
+      mode: vxlan
+      vxlanPort: 8472
+      vxlanVNI: 4096
+      mtu: 1450
+    podCIDR: "{{ pod_network }}"
+    serviceCIDR: "{{ service_network }}"
+  storage:
+    type: etcd
+    etcd:
+      peerAddress: "{{ private_ip }}"
+  extensions:
+    storage:
+      type: longhorn
+    helm:
+      repositories:
+        - name: longhorn
+          url: https://charts.longhorn.io
+        - name: rancher-stable
+          url: https://releases.rancher.com/server-charts/stable
+        - name: cloudnative-pg
+          url: https://cloudnative-pg.github.io/charts

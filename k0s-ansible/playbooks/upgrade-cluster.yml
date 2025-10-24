@@ -1,0 +1,68 @@
+---
+- name: Upgrade k0s controllers
+  hosts: controllers
+  serial: 1
+  become: true
+  vars:
+    k0s_new_version: "{{ k0s_new_version | default('v1.27.4+k0s.0') }}"
+  tasks:
+    - name: Stop k0s controller
+      systemd:
+        name: k0scontroller
+        state: stopped
+      
+    - name: Download new k0s version
+      get_url:
+        url: "https://github.com/k0sproject/k0s/releases/download/{{ k0s_new_version }}/k0s-{{ k0s_new_version }}-amd64"
+        dest: /usr/local/bin/k0s
+        mode: '0755'
+      
+    - name: Start k0s controller
+      systemd:
+        name: k0scontroller
+        state: started
+      
+    - name: Wait for controller to be ready
+      wait_for:
+        port: 6443
+        delay: 10
+        timeout: 300
+
+- name: Upgrade k0s workers
+  hosts: workers
+  serial: 1
+  become: true
+  vars:
+    k0s_new_version: "{{ k0s_new_version | default('v1.27.4+k0s.0') }}"
+  tasks:
+    - name: Drain node
+      kubernetes.core.k8s_drain:
+        name: "{{ inventory_hostname }}"
+        delete_options:
+          ignore_daemonsets: true
+          delete_emptydir_data: true
+        kubeconfig: /var/lib/k0s/pki/admin.conf
+      delegate_to: "{{ groups['controllers'][0] }}"
+      
+    - name: Stop k0s worker
+      systemd:
+        name: k0sworker
+        state: stopped
+      
+    - name: Download new k0s version
+      get_url:
+        url: "https://github.com/k0sproject/k0s/releases/download/{{ k0s_new_version }}/k0s-{{ k0s_new_version }}-amd64"
+        dest: /usr/local/bin/k0s
+        mode: '0755'
+      
+    - name: Start k0s worker
+      systemd:
+        name: k0sworker
+        state: started
+      
+    - name: Uncordon node
+      kubernetes.core.k8s_drain:
+        name: "{{ inventory_hostname }}"
+        uncordon: true
+        kubeconfig: /var/lib/k0s/pki/admin.conf
+      delegate_to: "{{ groups['controllers'][0] }}"

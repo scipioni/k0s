@@ -1,0 +1,76 @@
+---
+- name: Install required packages
+  apt:
+    name:
+      - curl
+      - wget
+      - gnupg
+      - software-properties-common
+    state: present
+    update_cache: yes
+
+- name: Download k0s binary
+  get_url:
+    url: "https://github.com/k0sproject/k0s/releases/download/{{ k0s_version }}/k0s-{{ k0s_version }}-amd64"
+    dest: /usr/local/bin/k0s
+    mode: '0755'
+
+- name: Create k0s directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ k0s_config_dir }}"
+    - "{{ k0s_data_dir }}"
+
+- name: Copy k0s configuration
+  template:
+    src: k0s-config.yaml
+    dest: "{{ k0s_config_dir }}/k0s.yaml"
+    mode: '0644'
+
+- name: Initialize first controller
+  shell: k0s install controller --config {{ k0s_config_dir }}/k0s.yaml --enable-worker
+  when: inventory_hostname == groups['controllers'][0]
+
+- name: Get join token from first controller
+  shell: k0s token create --role=controller --expiry=10m
+  register: controller_token
+  when: inventory_hostname == groups['controllers'][0]
+
+- name: Store controller token
+  set_fact:
+    k0s_controller_token: "{{ controller_token.stdout }}"
+  when: inventory_hostname == groups['controllers'][0]
+
+- name: Create token file for additional controllers
+  copy:
+    content: "{{ hostvars[groups['controllers'][0]].k0s_controller_token }}"
+    dest: /tmp/controller-token
+    mode: '0600'
+  when: inventory_hostname != groups['controllers'][0]
+
+- name: Join additional controllers
+  shell: k0s install controller --config {{ k0s_config_dir }}/k0s.yaml --enable-worker --token-file /tmp/controller-token
+  when: inventory_hostname != groups['controllers'][0]
+
+- name: Start k0s service
+  systemd:
+    name: k0scontroller
+    state: started
+    enabled: yes
+
+- name: Wait for k0s to be ready
+  wait_for:
+    port: 6443
+    delay: 10
+    timeout: 300
+
+- name: Verify k0s controller status
+  shell: k0s status
+  register: k0s_status
+
+- name: Display k0s status
+  debug:
+    var: k0s_status.stdout

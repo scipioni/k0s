@@ -1,0 +1,11 @@
+# Controller-specific variables
+k0s_role: "controller"
+enable_worker: true
+
+# etcd configuration
+etcd_data_dir: "{{ k0s_data_dir }}/etcd"
+
+# Controller ports
+api_port: 6443
+etcd_port: 2380
+etcd_client_port: 2379

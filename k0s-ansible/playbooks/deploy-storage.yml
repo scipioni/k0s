@@ -1,0 +1,12 @@
+---
+- name: Deploy load balancer
+  hosts: controllers[0]
+  become: true
+  roles:
+    - loadbalancer
+
+- name: Deploy Longhorn storage
+  hosts: controllers[0]
+  become: true
+  roles:
+    - longhorn

@@ -1,0 +1,53 @@
+---
+- name: Create cattle-system namespace
+  kubernetes.core.k8s:
+    name: cattle-system
+    api_version: v1
+    kind: Namespace
+    state: present
+    kubeconfig: /var/lib/k0s/pki/admin.conf
+
+- name: Add Rancher Helm repository
+  kubernetes.core.helm_repository:
+    name: rancher-stable
+    repo_url: https://releases.rancher.com/server-charts/stable
+    kubeconfig: /var/lib/k0s/pki/admin.conf
+
+- name: Install Rancher
+  kubernetes.core.helm:
+    name: rancher
+    chart_ref: rancher-stable/rancher
+    release_namespace: cattle-system
+    create_namespace: yes
+    values:
+      hostname: rancher.{{ load_balancer_ip }}.nip.io
+      bootstrapPassword: "{{ rancher_admin_password }}"
+      replicas: 2
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
+        limits:
+          cpu: "1000m"
+          memory: "2Gi"
+    kubeconfig: /var/lib/k0s/pki/admin.conf
+
+- name: Wait for Rancher to be ready
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: rancher
+    namespace: cattle-system
+    kubeconfig: /var/lib/k0s/pki/admin.conf
+  register: rancher_status
+  until: rancher_status.resources[0].status.readyReplicas == rancher_status.resources[0].status.replicas
+  retries: 60
+  delay: 10
+
+- name: Display Rancher access information
+  debug:
+    msg: |
+      Rancher is now available at: https://rancher.{{ load_balancer_ip }}.nip.io
+      Username: admin
+      Password: {{ rancher_admin_password }}
+      Please change the password after first login.

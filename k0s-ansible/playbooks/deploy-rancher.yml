@@ -1,0 +1,6 @@
+---
+- name: Deploy Rancher
+  hosts: controllers[0]
+  become: true
+  roles:
+    - rancher

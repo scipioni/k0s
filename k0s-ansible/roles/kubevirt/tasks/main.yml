@@ -1,0 +1,61 @@
+---
+- name: Create KubeVirt namespace
+  kubernetes.core.k8s:
+    name: kubevirt
+    api_version: v1
+    kind: Namespace
+    state: present
+    kubeconfig: /var/lib/k0s/pki/admin.conf
+
+- name: Add KubeVirt Helm repository
+  kubernetes.core.helm_repository:
+    name: kubevirt
+    repo_url: https://kubevirt.github.io/helm-charts
+    kubeconfig: /var/lib/k0s/pki/admin.conf
+
+- name: Install KubeVirt operator
+  kubernetes.core.helm:
+    name: kubevirt
+    chart_ref: kubevirt/kubevirt
+    release_namespace: kubevirt
+    create_namespace: yes
+    values:
+      kubevirt:
+        version: "v1.0.0"
+        imagePullPolicy: IfNotPresent
+    kubeconfig: /var/lib/k0s/pki/admin.conf
+
+- name: Create KubeVirt CR
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: kubevirt.io/v1
+      kind: KubeVirt
+      metadata:
+        name: kubevirt
+        namespace: kubevirt
+      spec:
+        configuration:
+          developerConfiguration:
+            featureGates:
+              - LiveMigration
+              - HotplugVolumes
+              - CPUManager
+              - NUMA
+    kubeconfig: /var/lib/k0s/pki/admin.conf
+
+- name: Wait for KubeVirt to be ready
+  kubernetes.core.k8s_info:
+    api_version: kubevirt.io/v1
+    kind: KubeVirt
+    name: kubevirt
+    namespace: kubevirt
+    kubeconfig: /var/lib/k0s/pki/admin.conf
+  register: kubevirt_status
+  until: kubevirt_status.resources[0].status.phase == "Deployed"
+  retries: 30
+  delay: 10
+
+- name: Display KubeVirt status
+  debug:
+    msg: "KubeVirt is now deployed and ready for virtual machine workloads"

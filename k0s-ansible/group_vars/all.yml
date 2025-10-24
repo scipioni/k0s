@@ -1,0 +1,34 @@
+# Network configuration
+cluster_network: "10.244.0.0/16"
+service_network: "10.96.0.0/12"
+pod_network: "10.244.0.0/16"
+
+# k0s configuration
+k0s_version: "v1.27.3+k0s.0"
+k0s_data_dir: "/var/lib/k0s"
+k0s_config_dir: "/etc/k0s"
+
+# Storage configuration
+longhorn_storage_path: "{{ longhorn_mount_point }}"
+longhorn_replica_count: 2
+longhorn_device: "{{ storage_device }}"
+
+# Network interfaces
+public_interface: "{{ public_interface }}"
+private_interface: "{{ private_interface }}"
+
+# Load balancer
+load_balancer_ip: "YOUR_PUBLIC_IP"
+
+# PostgreSQL
+postgresql_namespace: "postgresql"
+postgresql_storage_size: "20Gi"
+postgresql_replicas: 2
+
+# Rancher
+rancher_admin_password: "admin123"
+
+# AWS/Backup credentials
+#aws_access_key: "YOUR_AWS_ACCESS_KEY"
+#aws_secret_key: "YOUR_AWS_SECRET_KEY"
+postgres_password: "YOUR_POSTGRES_PASSWORD"

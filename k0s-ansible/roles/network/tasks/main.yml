@@ -1,0 +1,31 @@
+---
+# - name: Configure network interfaces
+#   template:
+#     src: network-interfaces.j2
+#     dest: /etc/netplan/01-k0s-network.yaml
+#     mode: '0644'
+#   notify: apply netplan
+
+# - name: Ensure private interface is up
+#   systemd:
+#     name: systemd-networkd
+#     state: restarted
+
+# - name: Configure firewall rules
+#   ufw:
+#     rule: allow
+#     port: "{{ item.port }}"
+#     proto: "{{ item.proto }}"
+#     interface: "{{ item.interface }}"
+#   loop:
+#     - { port: "6443", proto: "tcp", interface: "{{ private_interface }}" }
+#     - { port: "8472", proto: "udp", interface: "{{ private_interface }}" }
+#     - { port: "10250", proto: "tcp", interface: "{{ private_interface }}" }
+#     - { port: "9100", proto: "tcp", interface: "{{ private_interface }}" }
+#     - { port: "443", proto: "tcp", interface: "{{ public_interface }}" }
+#     - { port: "80", proto: "tcp", interface: "{{ public_interface }}" }
+
+# - name: Enable firewall
+#   ufw:
+#     state: enabled
+#     policy: deny

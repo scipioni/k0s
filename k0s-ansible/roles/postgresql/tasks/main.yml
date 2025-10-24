@@ -1,0 +1,138 @@
+---
+- name: Add CloudNativePG Helm repository
+  kubernetes.core.helm_repository:
+    name: cloudnative-pg
+    repo_url: https://cloudnative-pg.github.io/charts
+    kubeconfig: /var/lib/k0s/pki/admin.conf
+
+- name: Install CloudNativePG operator
+  kubernetes.core.helm:
+    name: cloudnative-pg
+    chart_ref: cloudnative-pg/cloudnative-pg
+    release_namespace: cnpg-system
+    create_namespace: yes
+    kubeconfig: /var/lib/k0s/pki/admin.conf
+
+- name: Create PostgreSQL namespace
+  kubernetes.core.k8s:
+    name: "{{ postgresql_namespace }}"
+    api_version: v1
+    kind: Namespace
+    state: present
+    kubeconfig: /var/lib/k0s/pki/admin.conf
+
+- name: Deploy PostgreSQL cluster
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: postgresql.cnpg.io/v1
+      kind: Cluster
+      metadata:
+        name: postgres-cluster
+        namespace: "{{ postgresql_namespace }}"
+      spec:
+        instances: "{{ postgresql_replicas }}"
+        primaryUpdateStrategy: unsupervised
+        
+        postgresql:
+          parameters:
+            max_connections: "200"
+            shared_buffers: "256MB"
+            effective_cache_size: "1GB"
+            
+        bootstrap:
+          initdb:
+            database: appdb
+            owner: appuser
+            secret:
+              name: postgres-credentials
+              
+        storage:
+          size: "{{ postgresql_storage_size }}"
+          storageClass: longhorn-ha
+          
+        monitoring:
+          enabled: true
+          
+        backup:
+          retentionPolicy: "30d"
+          barmanObjectStore:
+            destinationPath: "s3://YOUR_BACKUP_BUCKET/postgres"
+            s3Credentials:
+              accessKeyId:
+                name: postgres-backup-credentials
+                key: ACCESS_KEY_ID
+              secretAccessKey:
+                name: postgres-backup-credentials
+                key: SECRET_ACCESS_KEY
+    kubeconfig: /var/lib/k0s/pki/admin.conf
+
+- name: Create PostgreSQL credentials
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: postgres-credentials
+        namespace: "{{ postgresql_namespace }}"
+      type: Opaque
+      stringData:
+        username: appuser
+        password: "{{ postgres_password }}"
+    kubeconfig: /var/lib/k0s/pki/admin.conf
+
+- name: Create backup credentials
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: postgres-backup-credentials
+        namespace: "{{ postgresql_namespace }}"
+      type: Opaque
+      stringData:
+        ACCESS_KEY_ID: "{{ aws_access_key }}"
+        SECRET_ACCESS_KEY: "{{ aws_secret_key }}"
+    kubeconfig: /var/lib/k0s/pki/admin.conf
+
+- name: Create PostgreSQL service for external access
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: postgres-cluster-rw
+        namespace: "{{ postgresql_namespace }}"
+      spec:
+        type: LoadBalancer
+        loadBalancerIP: "{{ load_balancer_ip }}"
+        ports:
+          - port: 5432
+            targetPort: 5432
+        selector:
+          cnpg.io/cluster: postgres-cluster
+          role: primary
+    kubeconfig: /var/lib/k0s/pki/admin.conf
+
+- name: Wait for PostgreSQL cluster to be ready
+  kubernetes.core.k8s_info:
+    api_version: postgresql.cnpg.io/v1
+    kind: Cluster
+    name: postgres-cluster
+    namespace: "{{ postgresql_namespace }}"
+    kubeconfig: /var/lib/k0s/pki/admin.conf
+  register: postgres_status
+  until: postgres_status.resources[0].status.instances == postgres_status.resources[0].status.readyInstances
+  retries: 30
+  delay: 10
+
+- name: Display PostgreSQL connection information
+  debug:
+    msg: |
+      PostgreSQL is now available at: {{ load_balancer_ip }}:5432
+      Database: appdb
+      Username: appuser
+      Password: {{ postgres_password }}

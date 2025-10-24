@@ -1,0 +1,6 @@
+---
+- name: Setup workers
+  hosts: workers
+  become: true
+  roles:
+    - k0s-worker

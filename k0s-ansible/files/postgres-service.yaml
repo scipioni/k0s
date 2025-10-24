@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-cluster-rw
+  namespace: postgresql
+spec:
+  type: LoadBalancer
+  loadBalancerIP: "{{ load_balancer_ip }}"
+  ports:
+    - port: 5432
+      targetPort: 5432
+  selector:
+    cnpg.io/cluster: postgres-cluster
+    role: primary

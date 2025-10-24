@@ -1,0 +1,14 @@
+---
+# - name: Setup k0s cluster prerequisites
+#   hosts: cluster
+#   become: true
+#   roles:
+#     - common
+#     - network
+#     - storage
+
+- name: Setup controllers
+  hosts: controllers
+  become: true
+  roles:
+    - k0s-controller

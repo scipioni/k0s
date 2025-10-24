@@ -1,0 +1,5 @@
+# Worker-specific variables
+k0s_role: "worker"
+
+# Worker configuration
+kubelet_port: 10250

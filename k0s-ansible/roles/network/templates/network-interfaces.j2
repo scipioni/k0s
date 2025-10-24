@@ -1,0 +1,15 @@
+network:
+  version: 2
+  ethernets:
+    {{ public_interface }}:
+      addresses:
+        - {{ ansible_host }}/24
+      gateway4: 10.1.109.1
+      nameservers:
+        addresses: [8.8.8.8, 8.8.4.4]
+    {{ private_interface }}:
+      addresses:
+        - {{ private_ip }}/24
+      gateway4: 10.0.0.1
+      nameservers:
+        addresses: [8.8.8.8, 8.8.4.4]
